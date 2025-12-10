@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: flask-mongodb-ns
+  labels:
+    app: mongodb
+spec:
+  # Service name for stable network identity
+  serviceName: "mongodb-service"
+  
+  # Number of MongoDB instances (1 for single instance)
+  replicas: 1
+  
+  # Selector to identify pods managed by this StatefulSet
+  selector:
+    matchLabels:
+      app: mongodb
+  
+  # Pod template - defines what each MongoDB pod looks like
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:7.0
+        
+        # Container port MongoDB listens on
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        
+        # Environment variables for MongoDB authentication
+        env:
+        # Enable authentication
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-username
+        
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: mongo-root-password
+        
+        # Resource requests and limits
+        # Request: Guaranteed resources (Kubernetes reserves this)
+        # Limit: Maximum resources (pod gets killed if exceeded)
+        resources:
+          requests:
+            cpu: "200m"        # 0.2 CPU cores (200 millicores)
+            memory: "250Mi"    # 250 MiB of RAM
+          limits:
+            cpu: "500m"        # 0.5 CPU cores max
+            memory: "500Mi"    # 500 MiB of RAM max
+        
+        # Volume mount - where MongoDB stores data inside container
+        volumeMounts:
+        - name: mongodb-storage
+          mountPath: /data/db  # MongoDB's default data directory
+        
+        # Liveness probe - checks if MongoDB is alive
+        # If fails, Kubernetes restarts the container
+        livenessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 30  # Wait 30s before first check
+          periodSeconds: 10        # Check every 10s
+          timeoutSeconds: 5        # 5s timeout
+          failureThreshold: 3      # Restart after 3 failures
+        
+        # Readiness probe - checks if MongoDB is ready to accept connections
+        # If fails, pod removed from service endpoints (no traffic sent)
+        readinessProbe:
+          exec:
+            command:
+            - mongosh
+            - --eval
+            - "db.adminCommand('ping')"
+          initialDelaySeconds: 10  # Wait 10s before first check
+          periodSeconds: 5         # Check every 5s
+          timeoutSeconds: 3        # 3s timeout
+          failureThreshold: 3      # Mark unready after 3 failures
+  
+  # Volume claim template - creates PVC for each pod
+  volumeClaimTemplates:
+  - metadata:
+      name: mongodb-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]  # Single node read/write
+      resources:
+        requests:
+          storage: 1Gi  # Request 1GB of storage

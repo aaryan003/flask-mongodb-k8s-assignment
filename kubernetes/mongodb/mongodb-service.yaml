@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: flask-mongodb-ns
+  labels:
+    app: mongodb
+spec:
+  type: ClusterIP
+  
+  # Selector: Routes traffic to pods with matching labels
+  selector:
+    app: mongodb
+  
+  # Ports configuration
+  ports:
+  - name: mongodb
+    protocol: TCP
+    port: 27017        # Service port (what Flask connects to)
+    targetPort: 27017  # Pod port (where MongoDB listens)
+  
+  sessionAffinity: ClientIP

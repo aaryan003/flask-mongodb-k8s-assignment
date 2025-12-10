@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flask-mongodb-ns
+  labels:
+    name: flask-mongodb-ns
+    environment: development
+    project: flask-mongodb-k8s
